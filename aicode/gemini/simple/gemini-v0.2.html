@@ -474,16 +474,9 @@
             let aiResponse = '';
             let isGraph = false;
 
-            if (prompt.toLowerCase().includes('generate graph') || prompt.toLowerCase().includes('create graph') || prompt.toLowerCase().includes('draw')) {
-                aiResponse = await generateMermaidCode(prompt);
-                isGraph = true;
-            } else if (prompt.toLowerCase().includes('explain graph') || prompt.toLowerCase().includes('explain code') || prompt.toLowerCase().includes('what does this do')) {
-                const lastMermaidMessage = Array.from(chatHistoryMain.children).reverse().find(el => el.classList.contains('ai') && el.querySelector('.mermaid-container'));
-                const lastMermaidCode = lastMermaidMessage ? lastMermaidMessage.querySelector('.mermaid-container').innerText : '';
-                aiResponse = await explainMermaidCode(lastMermaidCode || prompt);
-            } else {
-                aiResponse = await chatWithAI(prompt);
-            }
+            // Always request Mermaid code for any user prompt
+            aiResponse = await generateMermaidCode(prompt);
+            isGraph = true;
 
             loadingMessage.remove();
 
@@ -553,17 +546,7 @@
             return await callGeminiApi(systemPrompt, userQuery);
         };
 
-        const explainMermaidCode = async (code) => {
-            const systemPrompt = `You are a helpful assistant that explains Mermaid JS code. Provide a clear and concise explanation of what the following Mermaid code does. Focus on the structure, components, and flow of the diagram. Do not include any code or code blocks in your response.`;
-            const userQuery = `Explain the following Mermaid code:\n\n${code}`;
-            return await callGeminiApi(systemPrompt, userQuery);
-        };
-
-        const chatWithAI = async (prompt) => {
-            const systemPrompt = `You are a friendly and helpful assistant that specializes in Mermaid JS diagrams. You can help with generating code, explaining concepts, or answering general questions about Mermaid. Keep your responses conversational and encouraging.`;
-            const userQuery = `The user says: "${prompt}"`;
-            return await callGeminiApi(systemPrompt, userQuery);
-        };
+    // Non-graph conversational and explanation functions removed — only generateMermaidCode is used.
         
         // --- Event Listeners ---
         sendBtn.addEventListener('click', handleUserInput);
