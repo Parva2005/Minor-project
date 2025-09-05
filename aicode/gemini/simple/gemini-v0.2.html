@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Graph Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --font-size-base: 1rem;
+            --font-size-lg: 1.125rem;
+            --font-size-xl: 1.25rem;
+            --font-size-2xl: 1.5rem;
+            --font-size-3xl: 1.875rem;
+            --font-size-4xl: 2.25rem;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            font-size: var(--font-size-base);
+        }
+        
+        #mermaid-container > svg {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .chat-message.user {
+            background-color: #4A5568;
+            align-self: flex-end;
+            border-radius: 1.5rem 1.5rem 0.5rem 1.5rem;
+        }
+
+        .chat-message.ai {
+            background-color: #2D3748;
+            align-self: flex-start;
+            border-radius: 1.5rem 1.5rem 1.5rem 0.5rem;
+        }
+
+        .loading-dots:after {
+            content: ' .';
+            animation: dots 1s steps(5, end) infinite;
+        }
+
+        @keyframes dots {
+            to {
+                content: '...';
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-slate-900 text-slate-200 h-screen overflow-hidden flex flex-col">
+
+    <!-- Main Container -->
+    <div class="flex flex-col flex-1 h-full">
+
+        <!-- Top Header -->
+        <header class="bg-slate-800 p-4 shadow-lg flex justify-between items-center z-10">
+            <h1 class="text-xl sm:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500">
+                AI Graph Generator
+            </h1>
+            <button id="new-chat-btn" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-2 px-4 rounded-full transition-colors">
+                New Chat +
+            </button>
+        </header>
+
+        <!-- Main Content Area with Sidebar -->
+        <div class="flex flex-1 overflow-hidden">
+
+            <!-- Sidebar -->
+            <aside class="w-64 bg-slate-800 p-4 border-r border-slate-700 overflow-y-auto hidden md:block">
+                <h2 class="text-lg font-semibold mb-4">Chat History</h2>
+                <ul id="chat-history-list" class="space-y-2">
+                    <!-- Chat titles will be added here dynamically -->
+                </ul>
+            </aside>
+
+            <!-- Main Chat and Canvas View -->
+            <main class="flex-1 flex flex-col overflow-hidden p-6 sm:p-10 relative">
+
+                <!-- Chat Display Area -->
+                <div id="chat-history-main" class="flex-1 overflow-y-auto pr-4 mb-4">
+                </div>
+
+                <!-- Input Prompt Area -->
+                <div class="flex items-center space-x-4 mt-auto">
+                    <input type="text" id="chat-input" class="flex-1 p-4 bg-slate-800 rounded-2xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors placeholder-slate-400 text-slate-200" placeholder="Type your prompt...">
+                    <button id="send-btn" class="bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-semibold py-4 px-6 rounded-2xl transition-colors shadow-lg">
+                        Send
+                    </button>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- Core Application Logic ---
+
+        const newChatBtn = document.getElementById('new-chat-btn');
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('send-btn');
+        const chatHistoryMain = document.getElementById('chat-history-main');
+        const chatHistoryList = document.getElementById('chat-history-list');
+
+        let currentChatId = null;
+
+        const newChat = () => {
+            currentChatId = Date.now();
+            chatHistoryMain.innerHTML = `<div class="chat-message ai p-4 max-w-lg mx-2 mb-2"><p>Hello! I'm your AI assistant for Mermaid graphs. You can ask me to generate a graph from a description or explain a piece of Mermaid code. What can I help you with?</p></div>`;
+            updateChatHistoryList();
+            chatInput.focus();
+        };
+
+        const updateChatHistoryList = () => {
+            const chatTitle = "New Chat"; // Placeholder for now
+            const listItem = document.createElement('li');
+            listItem.innerHTML = `<button class="w-full text-left p-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors">${chatTitle}</button>`;
+            chatHistoryList.prepend(listItem);
+        };
+
+        const renderMessage = (message, sender, isGraph = false) => {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('chat-message', 'p-4', 'max-w-xl', 'mx-2', 'mb-2');
+
+            if (sender === 'user') {
+                messageElement.classList.add('user');
+                messageElement.innerText = message;
+            } else {
+                messageElement.classList.add('ai');
+                if (isGraph) {
+                    const mermaidId = `mermaid-graph-${Math.random().toString(36).substr(2, 9)}`;
+                    messageElement.innerHTML = `<div id="${mermaidId}" class="mermaid">${message}</div>`;
+                    mermaid.render(mermaidId, message).catch(error => {
+                        messageElement.innerHTML = `<p class="text-red-400">Error rendering graph:<br>${error.message}</p>`;
+                    });
+                } else {
+                    messageElement.innerText = message;
+                }
+            }
+
+            chatHistoryMain.appendChild(messageElement);
+            chatHistoryMain.scrollTop = chatHistoryMain.scrollHeight;
+        };
+
+        const handleUserInput = async () => {
+            const prompt = chatInput.value.trim();
+            if (!prompt) return;
+
+            renderMessage(prompt, 'user');
+            chatInput.value = '';
+
+            const loadingMessage = document.createElement('div');
+            loadingMessage.classList.add('chat-message', 'ai', 'p-4', 'max-w-xl', 'mx-2', 'mb-2', 'loading-dots');
+            loadingMessage.innerText = 'Thinking';
+            chatHistoryMain.appendChild(loadingMessage);
+            chatHistoryMain.scrollTop = chatHistoryMain.scrollHeight;
+
+            let aiResponse = '';
+            let isGraph = false;
+
+            if (prompt.toLowerCase().includes('generate graph') || prompt.toLowerCase().includes('create graph') || prompt.toLowerCase().includes('draw')) {
+                aiResponse = await generateMermaidCode(prompt);
+                isGraph = true;
+            } else if (prompt.toLowerCase().includes('explain graph') || prompt.toLowerCase().includes('explain code') || prompt.toLowerCase().includes('what does this do')) {
+                const lastMermaidMessage = Array.from(chatHistoryMain.children).reverse().find(el => el.classList.contains('ai') && el.innerHTML.includes('<svg'));
+                const lastMermaidCode = lastMermaidMessage ? lastMermaidMessage.innerText : '';
+                aiResponse = await explainMermaidCode(lastMermaidCode || prompt);
+            } else {
+                aiResponse = await chatWithAI(prompt);
+            }
+
+            loadingMessage.remove();
+
+            if (aiResponse) {
+                renderMessage(aiResponse, 'ai', isGraph);
+            } else {
+                renderMessage('I\'m sorry, I couldn\'t process that request.', 'ai');
+            }
+        };
+
+        // --- Gemini API Calls (Simplified for local use) ---
+        const callGeminiApi = async (systemPrompt, userQuery) => {
+            // NOTE: The API key here is a placeholder. You need to replace it with your actual Gemini API key.
+            const apiKey = "AIzaSyBazsMXQFqkFsD7R85ODywUtRL-MQcqO0w";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+            };
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status} ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            return result?.candidates?.[0]?.content?.parts?.[0]?.text;
+        };
+
+        const generateMermaidCode = async (prompt) => {
+            const systemPrompt = `You are a helpful assistant that generates Mermaid JS code. Respond only with the Mermaid code block and no other text. Your response must be in a single code block. The code block must start with "mermaid". Examples: "flowchart TD..." or "sequenceDiagram..." or "pie..." Do not include any explanation or additional text before or after the code block.`;
+            const userQuery = `Generate Mermaid JS code for the following request: ${prompt}`;
+            return await callGeminiApi(systemPrompt, userQuery);
+        };
+
+        const explainMermaidCode = async (code) => {
+            const systemPrompt = `You are a helpful assistant that explains Mermaid JS code. Provide a clear and concise explanation of what the following Mermaid code does. Focus on the structure, components, and flow of the diagram. Do not include any code or code blocks in your response.`;
+            const userQuery = `Explain the following Mermaid code:\n\n${code}`;
+            return await callGeminiApi(systemPrompt, userQuery);
+        };
+
+        const chatWithAI = async (prompt) => {
+            const systemPrompt = `You are a friendly and helpful assistant that specializes in Mermaid JS diagrams. You can help with generating code, explaining concepts, or answering general questions about Mermaid. Keep your responses conversational and encouraging.`;
+            const userQuery = `The user says: "${prompt}"`;
+            return await callGeminiApi(systemPrompt, userQuery);
+        };
+        
+        // --- Event Listeners ---
+        sendBtn.addEventListener('click', handleUserInput);
+        chatInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                handleUserInput();
+            }
+        });
+
+        // Add a "Ctrl + Enter" or "Cmd + Return" listener for prompt submission.
+        chatInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+                handleUserInput();
+            }
+        });
+
+        newChatBtn.addEventListener('click', newChat);
+
+        // Initial setup
+        newChat();
+
+    </script>
+</body>
+
+</html>
