@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered Mermaid Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Supabase Imports -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .mermaid>svg {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .chat-message.user {
+            background-color: #4A5568;
+            align-self: flex-end;
+            border-radius: 1.5rem 1.5rem 0.5rem 1.5rem;
+        }
+
+        .chat-message.ai {
+            background-color: #2D3748;
+            align-self: flex-start;
+            border-radius: 1.5rem 1.5rem 1.5rem 0.5rem;
+        }
+
+        .loading-dots:after {
+            content: ' .';
+            animation: dots 1s steps(5, end) infinite;
+        }
+
+        @keyframes dots {
+            to {
+                content: '...';
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-slate-900 text-slate-200 p-4 sm:p-8 flex flex-col items-center justify-center min-h-screen">
+    <div class="container mx-auto max-w-5xl h-[80vh] flex flex-col">
+        <div class="bg-slate-800 rounded-2xl shadow-xl p-6 sm:p-10 border border-slate-700 h-full flex flex-col overflow-hidden">
+            <header class="text-center mb-6">
+                <h1 class="text-3xl sm:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500">
+                    Mermaid Graph Chatbot
+                </h1>
+            </header>
+
+            <!-- Chat History Display Area -->
+            <div id="chat-history" class="flex-grow overflow-y-auto mb-6 p-2 space-y-4">
+                <div class="chat-message ai p-4 max-w-lg mx-2 mb-2">
+                    <p>Hello! I'm your AI assistant for Mermaid graphs. You can ask me to generate a graph from a description or explain a piece of Mermaid code. What can I help you with?</p>
+                </div>
+            </div>
+
+            <!-- Chat Input Area -->
+            <div class="flex items-center space-x-4">
+                <input type="text" id="chat-input" class="flex-grow p-4 bg-slate-700 rounded-2xl border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors placeholder-slate-400 text-slate-200" placeholder="Type your message here...">
+                <button id="send-btn" class="bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-semibold py-4 px-6 rounded-2xl transition-colors shadow-lg">
+                    Send
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        const SUPABASE_URL = 'https://xogoptiqzhytrodptfol.supabase.co'; // Replace with your Supabase URL
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvZ29wdGlxemh5dHJvZHB0Zm9sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwODk0NDMsImV4cCI6MjA3MjY2NTQ0M30.JrmvexfQW5uBWRK2N2vmAtVraCt0V6b8QOYG5uN935c'; // Replace with your Supabase anonymous key
+
+        // Initialize Supabase Client
+        let supabase;
+        try {
+            if (!SUPABASE_URL || !SUPABASE_ANON_KEY || SUPABASE_URL === 'YOUR_SUPABASE_URL' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY') {
+                throw new Error("Supabase URL and/or Anon Key not configured.");
+            }
+            supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            console.log("Supabase client initialized successfully.");
+        } catch (error) {
+            console.error("Supabase Initialization Error:", error.message);
+            const initialMessage = document.querySelector("#chat-history .chat-message");
+            if(initialMessage) {
+                initialMessage.innerHTML = `<p class="text-red-400">Error: ${error.message}</p><p class="mt-2">Please replace 'YOUR_SUPABASE_URL' and 'YOUR_SUPABASE_ANON_KEY' in the code with your actual Supabase keys.</p>`;
+            }
+        }
+
+
+        // --- UI Elements ---
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('send-btn');
+        const chatHistory = document.getElementById('chat-history');
+
+        // --- Functions ---
+        const sendMessage = async (messageText, sender, isGraph = false) => {
+            if (!supabase) {
+                console.error("Supabase client is not initialized. Cannot send message.");
+                return;
+            }
+            if (messageText.trim() === '') return;
+
+            const { data, error } = await supabase
+                .from('chats')
+                .insert([{
+                    text: messageText,
+                    sender: sender,
+                    is_graph: isGraph
+                }]);
+
+            if (error) {
+                console.error('Error sending message:', error);
+            }
+        };
+
+        const renderMessage = (message) => {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('chat-message', 'p-4', 'max-w-lg', 'mx-2', 'mb-2');
+
+            if (message.sender === 'user') {
+                messageElement.classList.add('user');
+                messageElement.innerText = message.text;
+            } else {
+                messageElement.classList.add('ai');
+                if (message.is_graph) {
+                    const mermaidId = `mermaid-graph-${Math.random().toString(36).substr(2, 9)}`;
+                    messageElement.innerHTML = `<div id="${mermaidId}" class="mermaid">${message.text}</div>`;
+                    mermaid.render(mermaidId, message.text).catch(error => {
+                        messageElement.innerHTML = `<p class="text-red-400">Error rendering graph:<br>${error.message}</p>`;
+                    });
+                } else {
+                    messageElement.innerText = message.text;
+                }
+            }
+
+            chatHistory.appendChild(messageElement);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        };
+
+        const handleUserInput = async () => {
+            const prompt = chatInput.value.trim();
+            if (!prompt) return;
+
+            // Display user message instantly
+            renderMessage({ text: prompt, sender: 'user' });
+            await sendMessage(prompt, 'user');
+            chatInput.value = '';
+
+            // Show a loading indicator
+            const loadingMessage = document.createElement('div');
+            loadingMessage.classList.add('chat-message', 'ai', 'p-4', 'max-w-lg', 'mx-2', 'mb-2', 'loading-dots');
+            loadingMessage.innerText = 'Thinking';
+            chatHistory.appendChild(loadingMessage);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+
+            let aiResponse = '';
+            let isGraph = false;
+
+            // Check for keywords to determine the action
+            if (prompt.toLowerCase().includes('generate graph') || prompt.toLowerCase().includes('create graph') || prompt.toLowerCase().includes('draw')) {
+                aiResponse = await generateMermaidCode(prompt);
+                isGraph = true;
+            } else if (prompt.toLowerCase().includes('explain graph') || prompt.toLowerCase().includes('explain code') || prompt.toLowerCase().includes('what does this do')) {
+                const lastMermaidMessage = Array.from(chatHistory.children).reverse().find(el => el.classList.contains('ai') && el.innerHTML.includes('<svg'));
+                const lastMermaidCode = lastMermaidMessage ? lastMermaidMessage.innerText : '';
+                aiResponse = await explainMermaidCode(lastMermaidCode || prompt);
+            } else {
+                aiResponse = await chatWithAI(prompt);
+            }
+            
+            // Remove the loading indicator
+            loadingMessage.remove();
+
+            if (aiResponse) {
+                await sendMessage(aiResponse, 'ai', isGraph);
+            } else {
+                await sendMessage('I\'m sorry, I couldn\'t process that request.', 'ai');
+            }
+        };
+
+        const listenForChatMessages = async () => {
+             if (!supabase) {
+                console.error("Supabase client is not initialized. Cannot listen for messages.");
+                return;
+            }
+            supabase
+                .from('chats')
+                .select('*')
+                .order('created_at', { ascending: true })
+                .then(({ data, error }) => {
+                    if (error) {
+                        console.error('Error fetching chat history:', error);
+                        return;
+                    }
+                    data.forEach(renderMessage);
+                });
+
+            supabase
+                .from('chats')
+                .on('INSERT', (payload) => {
+                    renderMessage(payload.new);
+                })
+                .subscribe();
+        };
+
+        // --- Gemini API Calls ---
+        const callGeminiApi = async (systemPrompt, userQuery) => {
+            const apiKey = "AIzaSyBazsMXQFqkFsD7R85ODywUtRL-MQcqO0w";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+            };
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status} ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            return result?.candidates?.[0]?.content?.parts?.[0]?.text;
+        };
+
+        const generateMermaidCode = async (prompt) => {
+            const systemPrompt = `You are a helpful assistant that generates Mermaid JS code. Respond only with the Mermaid code block and no other text. Your response must be in a single code block. The code block must start with "mermaid". Examples: "flowchart TD..." or "sequenceDiagram..." or "pie..." Do not include any explanation or additional text before or after the code block.`;
+            const userQuery = `Generate Mermaid JS code for the following request: ${prompt}`;
+            return await callGeminiApi(systemPrompt, userQuery);
+        };
+
+        const explainMermaidCode = async (code) => {
+            const systemPrompt = `You are a helpful assistant that explains Mermaid JS code. Provide a clear and concise explanation of what the following Mermaid code does. Focus on the structure, components, and flow of the diagram. Do not include any code or code blocks in your response.`;
+            const userQuery = `Explain the following Mermaid code:\n\n${code}`;
+            return await callGeminiApi(systemPrompt, userQuery);
+        };
+
+        const chatWithAI = async (prompt) => {
+            const systemPrompt = `You are a friendly and helpful assistant that specializes in Mermaid JS diagrams. You can help with generating code, explaining concepts, or answering general questions about Mermaid. Keep your responses conversational and encouraging.`;
+            const userQuery = `The user says: "${prompt}"`;
+            return await callGeminiApi(systemPrompt, userQuery);
+        };
+
+        // --- Event Listeners ---
+        sendBtn.addEventListener('click', handleUserInput);
+        chatInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                handleUserInput();
+            }
+        });
+        
+        // Initial setup
+        listenForChatMessages();
+    </script>
+</body>
+
+</html>
