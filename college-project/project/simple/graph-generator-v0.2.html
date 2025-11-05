@@ -601,20 +601,74 @@
                 showNotification('No diagram to download.');
                 return;
             }
-            const serializer = new XMLSerializer();
-            const svgString = serializer.serializeToString(svgElement);
+
+            // Determine SVG dimensions: prefer viewBox, then width/height attributes, then bbox
+            let svgWidth, svgHeight;
+            try {
+                const viewBox = svgElement.viewBox && svgElement.viewBox.baseVal;
+                if (viewBox && viewBox.width && viewBox.height) {
+                    svgWidth = viewBox.width;
+                    svgHeight = viewBox.height;
+                } else if (svgElement.width && svgElement.width.baseVal && svgElement.width.baseVal.value) {
+                    svgWidth = svgElement.width.baseVal.value;
+                    svgHeight = svgElement.height.baseVal.value || svgElement.getBBox().height;
+                } else {
+                    const bbox = svgElement.getBBox();
+                    svgWidth = bbox.width || 800;
+                    svgHeight = bbox.height || 600;
+                }
+            } catch (err) {
+                // Fallback sizes
+                svgWidth = 800;
+                svgHeight = 600;
+            }
+
+            // Scale up for higher resolution exports. Use devicePixelRatio as baseline.
+            const DPR = window.devicePixelRatio || 1;
+            const exportScale = Math.max(1, DPR) * 2; // double device pixel ratio for crispness
+
             const canvas = document.createElement('canvas');
+            canvas.width = Math.ceil(svgWidth * exportScale);
+            canvas.height = Math.ceil(svgHeight * exportScale);
+            canvas.style.width = svgWidth + 'px';
+            canvas.style.height = svgHeight + 'px';
+
             const ctx = canvas.getContext('2d');
+            // Ensure a white background (optional) so transparent diagrams aren't lost
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Serialize SVG and ensure xmlns attribute exists
+            const serializer = new XMLSerializer();
+            let svgString = serializer.serializeToString(svgElement);
+            if (!/xmlns\=/.test(svgString)) {
+                svgString = svgString.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+            }
+
+            // Encode properly to support unicode characters
+            const svgData = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
+
             const img = new Image();
+            // Avoid tainting the canvas where possible
+            img.crossOrigin = 'anonymous';
             img.onload = function() {
-                ctx.drawImage(img, 0, 0);
-                const link = document.createElement('a');
-                link.download = 'diagram.png';
-                link.href = canvas.toDataURL('image/png');
-                link.click();
-                showNotification('Image downloaded successfully!');
+                try {
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const link = document.createElement('a');
+                    link.download = 'diagram.png';
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                    showNotification('Image downloaded successfully!');
+                } catch (err) {
+                    console.error('Download failed', err);
+                    showNotification('Failed to create image.');
+                }
             };
-            img.src = 'data:image/svg+xml;base64,' + btoa(svgString);
+            img.onerror = function(e) {
+                console.error('Image load error', e);
+                showNotification('Failed to render diagram for download.');
+            };
+            img.src = svgData;
         });
 
         function showNotification(message) {
