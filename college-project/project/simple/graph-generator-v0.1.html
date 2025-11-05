@@ -107,7 +107,7 @@ graph TD
                 showStatus('Generating Mermaid code...');
 
                 try {
-                    const apiKey = "AIzaSyBazsMXQFqkFsD7R85ODywUtRL-MQcqO0w";
+                    const apiKey = "AIzaSyBDd9T3WVUcGZczLnBp5dnnqrp75BPZNEo";
                     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
                     
                     const systemPrompt = `You are a helpful assistant that generates Mermaid JS code. Respond only with the Mermaid code block and no other text. Your response must be in a single code block. The code block must start with "mermaid". Examples: "flowchart TD..." or "sequenceDiagram..." or "pie..." Do not include any explanation or additional text before or after the code block.`;
@@ -156,7 +156,7 @@ graph TD
                 showStatus('Explaining the code...');
 
                 try {
-                    const apiKey = "AIzaSyBazsMXQFqkFsD7R85ODywUtRL-MQcqO0w";
+                    const apiKey = "AIzaSyBDd9T3WVUcGZczLnBp5dnnqrp75BPZNEo";
                     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
                     
                     const systemPrompt = `You are a helpful assistant that explains Mermaid JS code. Provide a clear and concise explanation of what the following Mermaid code does. Focus on the structure, components, and flow of the diagram. Do not include any code or code blocks in your response.`;
