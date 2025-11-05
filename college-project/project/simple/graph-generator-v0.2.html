@@ -414,7 +414,8 @@
                         <div id="preview-empty" style="color: var(--bg-medium); opacity: .8;">Rendered graph will appear here.</div>
                     </div>
 
-    <button id="download-image" class="material-icons" style="position: absolute; top: 10px; right: 10px; z-index: 10;">download</button>
+    <button id="download-image" class="copy-code material-icons" style="position: absolute; top: 10px; right: 10px; z-index: 10;">Download PNG</button>
+    <button id="copy-code-btn" class="copy-code" style="position: absolute; top: 10px; right: 140px; z-index: 10;">Copy Code</button>
                 </aside>
 
             </main>
@@ -430,8 +431,10 @@
         const chatHistoryMain = document.getElementById('chat-history-main');
         const chatHistoryList = document.getElementById('chat-history-list');
 
-        let currentChatId = null;
-        let chatHistoryData = [];
+    let currentChatId = null;
+    let chatHistoryData = [];
+    // Keep the most recent mermaid source rendered in preview so it can be copied
+    let lastMermaidCode = '';
 
         const newChat = () => {
             currentChatId = Date.now();
@@ -526,6 +529,9 @@
 
             const code = normalizeMermaid(mermaidText);
 
+            // Save the normalized mermaid source for copying
+            lastMermaidCode = code;
+
             // Clear previous preview and create a container for mermaid
             preview.innerHTML = `<div id="preview-mermaid" class="mermaid-container">${code}</div>`;
 
@@ -591,6 +597,10 @@
 
         document.getElementById('download-image').addEventListener('click', function() {
             const svgElement = document.querySelector('svg'); // Assuming the diagram is rendered in an SVG element
+            if (!svgElement) {
+                showNotification('No diagram to download.');
+                return;
+            }
             const serializer = new XMLSerializer();
             const svgString = serializer.serializeToString(svgElement);
             const canvas = document.createElement('canvas');
@@ -623,19 +633,32 @@
             }, 3000);
         }
 
+        // Expose the notification helper to non-module scope if other scripts call it
+        window.showNotification = showNotification;
+
+        // Copy-mermaid-code button handler: copies the last generated Mermaid source
+        const copyBtn = document.getElementById('copy-code-btn');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', () => {
+                if (!lastMermaidCode) {
+                    showNotification('No Mermaid code to copy.');
+                    return;
+                }
+                navigator.clipboard.writeText(lastMermaidCode).then(() => {
+                    showNotification('Mermaid code copied to clipboard!');
+                }).catch((err) => {
+                    console.error('Copy failed', err);
+                    showNotification('Failed to copy Mermaid code.');
+                });
+            });
+        }
+
         // Initial setup
         newChat();
 
     </script>
 
-    <script>
-        function copyCode() {
-            const code = document.querySelector('svg').outerHTML; // Assuming the code is in the SVG element
-            navigator.clipboard.writeText(code).then(() => {
-                showNotification('Code copied to clipboard!');
-            });
-        }
-    </script>
+    
 </body>
 
 </html>
